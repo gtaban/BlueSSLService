@@ -25,12 +25,12 @@ import PackageDescription
 		name: "TLSService",
 		targets: [Target(name: "TLSService")],
 		dependencies: [
-			.Package(url: "https://github.com/IBM-Swift/BlueSocket.git", majorVersion: 0, minor: 12),
+            .Package(url: "https://github.com/gtaban/security.git", majorVersion: 0),
 			],
-		exclude: ["TLSService.xcodeproj", "README.md", "Sources/Info.plist"])
+		exclude: ["Certs"])
 		
 	#if os(Linux)
-		
+        // module map for OpenSSL libSSL and libcrypto
 		package.dependencies.append(
 			.Package(url: "https://github.com/IBM-Swift/OpenSSL.git", majorVersion: 0, minor: 3))
 		

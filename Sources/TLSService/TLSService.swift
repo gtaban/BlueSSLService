@@ -20,7 +20,9 @@
 //
 
 import Foundation
-import Socket
+import ServerSecurity
+
+//import Socket
 
 #if os(Linux)
 	import OpenSSL
@@ -33,7 +35,7 @@ import Dispatch
 ///
 /// **SSLService:** SSL Service Plugin for Socket using **Apple Secure Transport** on `macOS` and **OpenSSL** on `Linux`.
 ///
-public class SSLService: SSLServiceDelegate {
+public class SSLService: TLSServiceDelegate {
 	
 	// MARK: Statics
 	
@@ -111,178 +113,6 @@ public class SSLService: SSLServiceDelegate {
 		}
 	}
 	
-	// MARK: Configuration
-	
-	///
-	/// SSL Configuration
-	///
-	public struct Configuration {
-		
-		// MARK: Properties
-		
-		/// File name of CA certificate to be used.
-		public private(set) var caCertificateFilePath: String? = nil
-		
-		/// Path to directory containing hashed CA's to be used.
-		///	*Note:* `caCertificateDirPath` - All certificates in the specified directory **must** be hashed.
-		public private(set) var caCertificateDirPath: String? = nil
-		
-		/// Path to the certificate file to be used.
-		public private(set) var certificateFilePath: String? = nil
-		
-		/// Path to the key file to be used.
-		public private(set) var keyFilePath: String? = nil
-		
-		/// Path to the certificate chain file (optional).
-		public private(set) var certificateChainFilePath: String? = nil
-		
-		/// Path to PEM formatted certificate string.
-		public private(set) var certificateString: String? = nil
-		
-		/// True if server is using `self-signed` certificates.
-		public private(set) var certsAreSelfSigned = false
-        
-        /// True if isServer == false and the client accepts self-signed certificates. Defaults to false, be careful to not leave as true in production
-        public private(set) var clientAllowsSelfSignedCertificates = false
-		
-		#if os(Linux)
-			/// Cipher suites to use. Defaults to `DEFAULT:!DH`
-			public var cipherSuite: String = "DEFAULT:!DH"
-		#else
-			/// Cipher suites to use. Defaults to `14,13,2B,2F,2C,30,9E,9F,23,27,09,28,13,24,0A,14,67,33,6B,39,08,12,16,9C,9D,3C,3D,2F,35,0A`
-			// @FIXME: This isn't quite right, needs to be revisited.
-			public var cipherSuite: String = "14,13,2B,2F,2C,30,9E,9F,23,27,09,28,13,24,0A,14,67,33,6B,39,08,12,16,9C,9D,3C,3D,2F,35,0A"
-		
-			/// `True` to use default cipher list, false otherwise.
-			public var useDefaultCiphers: Bool = true
-
-			/// Cached array of previously imported PKCS12.
-			fileprivate var pkcs12Certs: CFArray? = nil
-		#endif
-		
-		/// Password (if needed) typically used for PKCS12 files.
-		public var password: String? = nil
-		
-		/// True if no backing certificates provided (Readonly).
-		public private(set) var noBackingCertificates = false
-		
-		// MARK: Lifecycle
-		
-		///
-		/// Initialize a configuration with no backing certificates.
-		///
-		/// - Parameters:
-		///		- cipherSuite:					Optional String containing the cipher suite to use.
-		///		- clientAllowsSelfSignedCertificates:
-		///										`true` to accept self-signed certificates from a server. `false` otherwise.
-		///										**Note:** This parameter is only used when `SSLService` is used with a client socket.
-		///
-		///	- Returns:	New Configuration instance.
-		///
-		public init(withCipherSuite cipherSuite: String? = nil, clientAllowsSelfSignedCertificates: Bool = true) {
-			
-			self.noBackingCertificates = true
-			self.clientAllowsSelfSignedCertificates = clientAllowsSelfSignedCertificates
-			if cipherSuite != nil {
-				self.cipherSuite = cipherSuite!
-			}
-		}
-		
-		///
-		/// Initialize a configuration using a `CA Certificate` file.
-		///
-		/// - Parameters:
-		///		- caCertificateFilePath:	Path to the PEM formatted CA certificate file.
-		///		- certificateFilePath:		Path to the PEM formatted certificate file.
-		///		- keyFilePath:				Path to the PEM formatted key file. If nil, `certificateFilePath` will be used.
-		///		- selfSigned:				True if certs are `self-signed`, false otherwise. Defaults to true.
-		///		- cipherSuite:				Optional String containing the cipher suite to use.
-		///
-		///	- Returns:	New Configuration instance.
-		///
-		public init(withCACertificateFilePath caCertificateFilePath: String?, usingCertificateFile certificateFilePath: String?, withKeyFile keyFilePath: String? = nil, usingSelfSignedCerts selfSigned: Bool = true, cipherSuite: String? = nil) {
-			
-			self.certificateFilePath = certificateFilePath
-			self.keyFilePath = keyFilePath ?? certificateFilePath
-			self.certsAreSelfSigned = selfSigned
-			self.caCertificateFilePath = caCertificateFilePath
-			if cipherSuite != nil {
-				self.cipherSuite = cipherSuite!
-			}
-		}
-		
-		///
-		/// Initialize a configuration using a `CA Certificate` directory.
-		///
-		///	*Note:* `caCertificateDirPath` - All certificates in the specified directory **must** be hashed using the `OpenSSL Certificate Tool`.
-		///
-		/// - Parameters:
-		///		- caCertificateDirPath:		Path to a directory containing CA certificates. *(see note above)*
-		///		- certificateFilePath:		Path to the PEM formatted certificate file. If nil, `certificateFilePath` will be used.
-		///		- keyFilePath:				Path to the PEM formatted key file (optional). If nil, `certificateFilePath` is used.
-		///		- selfSigned:				True if certs are `self-signed`, false otherwise. Defaults to true.
-		///		- cipherSuite:				Optional String containing the cipher suite to use.
-		///
-		///	- Returns:	New Configuration instance.
-		///
-		public init(withCACertificateDirectory caCertificateDirPath: String?, usingCertificateFile certificateFilePath: String?, withKeyFile keyFilePath: String? = nil, usingSelfSignedCerts selfSigned: Bool = true, cipherSuite: String? = nil) {
-			
-			self.certificateFilePath = certificateFilePath
-			self.keyFilePath = keyFilePath ?? certificateFilePath
-			self.certsAreSelfSigned = selfSigned
-			self.caCertificateDirPath = caCertificateDirPath
-			if cipherSuite != nil {
-				self.cipherSuite = cipherSuite!
-			}
-		}
-		
-		///
-		/// Initialize a configuration using a `Certificate Chain File`.
-		///
-		/// *Note:* If using a certificate chain file, the certificates must be in PEM format and must be sorted starting with the subject's certificate (actual client or server certificate), followed by intermediate CA certificates if applicable, and ending at the highest level (root) CA.
-		///
-		/// - Parameters:
-		///		- chainFilePath:                        Path to the certificate chain file (optional). *(see note above)*
-		///		- password:                             Password for the chain file (optional).
-		///		- selfSigned:                           True if certs are `self-signed`, false otherwise. Defaults to true.
-        ///     - clientAllowsSelfSignedCertificates:   True if, as a client, connections to self-signed servers are allowed
-		///		- cipherSuite:                          Optional String containing the cipher suite to use.
-		///
-		///	- Returns:	New Configuration instance.
-		///
-        public init(withChainFilePath chainFilePath: String?, withPassword password: String? = nil, usingSelfSignedCerts selfSigned: Bool = true, clientAllowsSelfSignedCertificates: Bool = false, cipherSuite: String? = nil) {
-			
-			self.certificateChainFilePath = chainFilePath
-			self.password = password
-			self.certsAreSelfSigned = selfSigned
-            self.clientAllowsSelfSignedCertificates = clientAllowsSelfSignedCertificates
-			if cipherSuite != nil {
-				self.cipherSuite = cipherSuite!
-			}
-		}
-
-		#if os(Linux)
-		///
-		/// Initialize a configuration using a `PEM formatted certificate in String form`.
-		///
-		/// - Parameters:
-		///		- certificateString:		PEM formatted certificate in String form.
-		///		- selfSigned:				True if certs are `self-signed`, false otherwise. Defaults to true.
-		///		- cipherSuite:				Optional String containing the cipher suite to use.
-		///
-		///	- Returns:	New Configuration instance.
-		///
-		public init(withPEMCertificateString certificateString: String, usingSelfSignedCerts selfSigned: Bool = true, cipherSuite: String? = nil) {
-			
-			self.certificateString = certificateString
-			self.certsAreSelfSigned = selfSigned
-			if cipherSuite != nil {
-				self.cipherSuite = cipherSuite!
-			}
-		}
-		#endif
-	}
-		
 	// MARK: Properties
 	
 	// MARK: -- Public
@@ -304,7 +134,7 @@ public class SSLService: SSLServiceDelegate {
 	// MARK: --- Read Only
 	
 	/// SSL Configuration (Read only)
-	public private(set) var configuration: Configuration
+	public private(set) var configuration: TLSConfiguration
 	
 	/// True if setup as server, false if setup as client.
 	public private(set) var isServer: Bool = true
@@ -358,7 +188,7 @@ public class SSLService: SSLServiceDelegate {
 	///
 	/// - Returns: `SSLService` instance.
 	///
-	public init?(usingConfiguration config: Configuration) throws {
+	public init?(usingConfiguration config: TLSConfiguration) throws {
 		
 		// Store it...
 		self.configuration = config
@@ -368,7 +198,7 @@ public class SSLService: SSLServiceDelegate {
 	}
 	
 	///
-	/// Clone an existing instance of `SSLService`.
+	/// Clone an existing instance of `SSLService`. Should only be called by Server.
 	///
 	/// - Parameter source:		The instance of `SSLService` to clone.
 	///
@@ -382,53 +212,36 @@ public class SSLService: SSLServiceDelegate {
 		try self.validate(configuration: source.configuration)
 		
 		// Initialize as server...
-		try self.initialize(asServer: true)
+        try self.didCreateServer()
 	}
 	
 	
-	// MARK: SSLServiceDelegate Protocol
+	// MARK: TLSServiceDelegate Protocol
 	
-	///
-	/// Initialize `SSLService`
-	///
-	/// - Parameter asServer:	True for initializing a server, otherwise a client.
-	///
-	public func initialize(asServer: Bool) throws {
-		
-		self.isServer = asServer
-
-		#if os(Linux)
-			
-			// Common initialization...
-			// 	- We only do this once...
-			if !SSLService.initialized {
-				SSL_library_init()
-				SSL_load_error_strings()
-				OPENSSL_config(nil)
-				OPENSSL_add_all_algorithms_conf()
-				SSLService.initialized = true
-			}
-			
-			// Server or client specific method determination...
-			if isServer {
-				
-				self.method = SSLv23_server_method()
-				
-			} else {
-				
-				self.method = SSLv23_client_method()
-			}
-			
-		#endif
-		
-		// Prepare the context...
-		try self.prepareContext()
-	}
+    ///
+    /// Initialize TLS Service for Client
+    ///
+    public func didCreateClient() throws {
+        
+        self.isServer = false
+        
+        try self.initialize()
+    }
+    
+    ///
+    /// Initialize TLS Service for Server
+    ///
+    public func didCreateServer() throws {
+        
+        self.isServer = true
+        
+        try self.initialize()
+    }
 	
 	///
 	/// Deinitialize `SSLService`
 	///
-	public func deinitialize() {
+	public func willDestroy() {
 		
 		#if os(Linux)
 			
@@ -473,14 +286,14 @@ public class SSLService: SSLServiceDelegate {
 	///
 	/// - Parameter socket:	The connected `Socket` instance.
 	///
-	public func onAccept(socket: Socket) throws {
-		
+    public func didAccept(connection socket: ConnectionDelegate) throws {
+
 		// If the new socket doesn't have a delegate, create one using self...
-		if socket.delegate == nil {
+		if socket.TLSdelegate == nil {
 			
 			let delegate = try SSLService(with: self)
-			socket.delegate = delegate
-			try socket.delegate?.onAccept(socket: socket)
+			socket.TLSdelegate = delegate
+			try socket.TLSdelegate?.didAccept(connection: socket)
 			
 		} else {
 			
@@ -519,7 +332,7 @@ public class SSLService: SSLServiceDelegate {
 	///
 	/// - Parameter socket:	The connected `Socket` instance.
 	///
-	public func onConnect(socket: Socket) throws {
+	public func didConnect(to socket: ConnectionDelegate) throws {
 		
 		#if os(Linux)
 			
@@ -543,152 +356,117 @@ public class SSLService: SSLServiceDelegate {
 		// Verify the connection...
 		try self.verifyConnection()
 	}
-	
-	///
-	/// Low level writer
-	///
-	/// - Parameters:
-	///		- buffer:		Buffer pointer.
-	///		- bufSize:		Size of the buffer.
-	///
-	///	- Returns the number of bytes written. Zero indicates SSL shutdown, less than zero indicates error.
-	///
-	public func send(buffer: UnsafeRawPointer, bufSize: Int) throws -> Int {
-		
-		#if os(Linux)
-			
-			let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
-				
-				guard let sslConnect = self.cSSL else {
-				
-					let reason = "ERROR: SSL_write, code: \(ECONNABORTED), reason: Unable to reference connection)"
-					throw SSLError.fail(Int(ECONNABORTED), reason)
-				}
-			
-				let rc = SSL_write(sslConnect, buffer, Int32(bufSize))
-				if rc < 0 {
-				
-					let lastError = SSL_get_error(sslConnect, rc)
-					if lastError == SSL_ERROR_WANT_READ || lastError == SSL_ERROR_WANT_WRITE {
-						
-						throw SSLError.retryNeeded
-					}
-				
-					try self.throwLastError(source: "SSL_write", err: lastError)
-					return 0
-				}
-				return Int(rc)
-			})
-			
-			return processed
-			
-		#else
-			
-			let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
-				
-				guard let sslContext = self.context else {
-					
-					let reason = "ERROR: SSL_write, code: \(ECONNABORTED), reason: Unable to reference connection)"
-					throw SSLError.fail(Int(ECONNABORTED), reason)
-				}
-				
-				var processed = 0
-				let status: OSStatus = SSLWrite(sslContext, buffer, bufSize, &processed)
-				if status == errSSLWouldBlock {
-					
-					throw SSLError.retryNeeded
-					
-				} else if status != errSecSuccess {
-					
-					try self.throwLastError(source: "SSLWrite", err: status)
-				}
-				return processed
-			})
-			
-			return processed
-			
-		#endif
-	}
-	
-	///
-	/// Low level reader
-	///
-	/// - Parameters:
-	///		- buffer:		Buffer pointer.
-	///		- bufSize:		Size of the buffer.
-	///
-	///	- Returns: the number of bytes read. Zero indicates SSL shutdown or in the case of a non-blocking socket, no data available for reading, less than zero indicates error.
-	///
-	public func recv(buffer: UnsafeMutableRawPointer, bufSize: Int) throws -> Int {
-		
-		#if os(Linux)
-			
-			let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
-				
-				guard let sslConnect = self.cSSL else {
-				
-					let reason = "ERROR: SSL_read, code: \(ECONNABORTED), reason: Unable to reference connection)"
-					throw SSLError.fail(Int(ECONNABORTED), reason)
-				}
-			
-				let rc = SSL_read(sslConnect, buffer, Int32(bufSize))
-				if rc < 0 {
-				
-					let lastError = SSL_get_error(sslConnect, rc)
-					if lastError == SSL_ERROR_WANT_READ || lastError == SSL_ERROR_WANT_WRITE {
 
-						errno = EAGAIN
-						return -1
-					}
-				
-					try self.throwLastError(source: "SSL_read", err: lastError)
-					return 0
-				}
-				return Int(rc)
-			})
-		
-			return processed
+    ///
+    /// Low level writer
+    ///
+    /// - Parameters:
+    ///        - data:        Data object to be written to endpoint
+    ///
+    ///    - Returns the number of bytes written. Zero indicates TLS shutdown, less than zero indicates error.
+    ///
+    public func willSend(data: Data) throws -> Int {
+        
+        print("\(#function):")
+        
+        // If there's no data in the Data object, no need to write anything...
+        if data.count == 0 {
+            return 0
+        }
+        
+        return try data.withUnsafeBytes() { [unowned self] (buffer: UnsafePointer<UInt8>) throws -> Int in
+            
+            return try self.willSendInternal(buffer: buffer, bufSize: data.count)
+        }
+    }
+
+    ///
+    /// Low level writer
+    ///
+    /// - Parameters:
+    ///        - buffer:        Buffer pointer to be written to socket.
+    ///        - bufSize:        Size of the buffer.
+    ///
+    ///    - Returns the number of bytes written. Zero indicates TLS shutdown, less than zero indicates error.
+    ///
+    public func willSend(buffer: UnsafeRawPointer, bufSize: Int) throws -> Int {
+        print("\(#function):")
+        
+        return try self.willSendInternal(buffer: buffer, bufSize: bufSize)
+    }
 	
-		#else
-			
-			let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
-				
-				guard let sslContext = self.context else {
-				
-					let reason = "ERROR: SSLRead, code: \(ECONNABORTED), reason: Unable to reference connection)"
-					throw SSLError.fail(Int(ECONNABORTED), reason)
-				}
-			
-				var processed = 0
-				let status: OSStatus = SSLRead(sslContext, buffer, bufSize, &processed)
-				if status != errSecSuccess && status != errSSLWouldBlock && status != errSSLClosedGraceful {
-				
-					try self.throwLastError(source: "SSLRead", err: status)
-				}
-			
-				if status == errSSLWouldBlock {
-				
-					errno = EWOULDBLOCK
-					return -1
-				}
-			
-				return status == errSSLClosedGraceful ? 0 : processed
-			
-			})
-			
-			return processed
-			
-		#endif
-	}
+    ///
+    /// Low level reader
+    ///
+    /// - Parameters:
+    ///        - buffer:        Buffer pointer.
+    ///        - bufSize:        Size of the buffer.
+    ///
+    ///    - Returns: the number of bytes read. Zero indicates TLS shutdown or in the case of a non-blocking socket, no data available for reading, less than zero indicates error.
+    ///
+    public func willReceive(into buffer: UnsafeMutableRawPointer, bufSize: Int) throws -> Int {
+        return try self.willReceiveInternal(into: buffer, bufSize: bufSize)
+    }
+    
+    ///
+    /// Read data from the socket.
+    ///
+    /// - Parameter data: The buffer to return the data in.
+    ///
+    /// - Returns: The number of bytes returned in the buffer.
+    ///
+    public func willReceive(into data: inout Data) throws -> Int {
+        
+        let count = data.count
+        return try data.withUnsafeMutableBytes() { [unowned self]  (buffer: UnsafeMutablePointer<UInt8>) throws -> Int in
+            
+            return try self.willReceive(into: buffer, bufSize: count)
+        }
+    }
 	
 	// MARK: Private Methods
 	
+    ///
+    /// Initialize `SSLService`
+    ///
+    /// - Parameter asServer:    True for initializing a server, otherwise a client.
+    ///
+    private func initialize() throws {
+        
+        #if os(Linux)
+            
+            // Common initialization...
+            //     - We only do this once...
+            if !SSLService.initialized {
+                SSL_library_init()
+                SSL_load_error_strings()
+                OPENSSL_config(nil)
+                OPENSSL_add_all_algorithms_conf()
+                SSLService.initialized = true
+            }
+            
+            // Server or client specific method determination...
+            if isServer {
+                
+                self.method = SSLv23_server_method()
+                
+            } else {
+                
+                self.method = SSLv23_client_method()
+            }
+            
+        #endif
+        
+        // Prepare the context...
+        try self.prepareContext()
+    }
+
 	///
 	/// Validate configuration
 	///
 	/// - Parameter configuration:	Configuration to validate.
 	///
-	private func validate(configuration: Configuration) throws {
+	private func validate(configuration: TLSConfiguration) throws {
 		
 		// Skip validation if no backing certificates provided...
 		if configuration.noBackingCertificates {
@@ -703,7 +481,7 @@ public class SSLService: SSLServiceDelegate {
 				certString.hasSuffix(SSLService.PEM_END_MARKER) &&
 				certString.utf8.count > 0 else {
 					
-					throw SSLError.fail(Int(ENOENT), "PEM Certificate String is not valid.")
+					throw TLSError.fail(Int(ENOENT), "PEM Certificate String is not valid.")
 			}
 			return
 		}
@@ -715,7 +493,7 @@ public class SSLService: SSLServiceDelegate {
 				
 				if configuration.certificateFilePath == nil || configuration.keyFilePath == nil {
 					
-					throw SSLError.fail(Int(ENOENT), "Certificate and/or key file not specified.")
+					throw TLSError.fail(Int(ENOENT), "Certificate and/or key file not specified.")
 				}
 				
 			} else {
@@ -726,13 +504,13 @@ public class SSLService: SSLServiceDelegate {
 					// Need a CA certificate (file or directory)...
 					if configuration.caCertificateFilePath == nil && configuration.caCertificateDirPath == nil {
 						
-						throw SSLError.fail(Int(ENOENT), "CA Certificate not specified.")
+						throw TLSError.fail(Int(ENOENT), "CA Certificate not specified.")
 					}
 					
 					// Also need a certificate file and key file...
 					if configuration.certificateFilePath == nil || configuration.keyFilePath == nil {
 						
-						throw SSLError.fail(Int(ENOENT), "Certificate and/or key file not specified.")
+						throw TLSError.fail(Int(ENOENT), "Certificate and/or key file not specified.")
 					}
 				}
 			}
@@ -743,7 +521,7 @@ public class SSLService: SSLServiceDelegate {
 			//	- Note: This is regardless of whether it's self-signed or not.
 			if configuration.certificateChainFilePath == nil {
 				
-				throw SSLError.fail(Int(ENOENT), "PKCS12 file not specified.")
+				throw TLSError.fail(Int(ENOENT), "PKCS12 file not specified.")
 			}
 			
 		#endif
@@ -755,7 +533,7 @@ public class SSLService: SSLServiceDelegate {
 			
 			if !FileManager.default.fileExists(atPath: caFile) {
 				
-				throw SSLError.fail(Int(ENOENT), "CA Certificate doesn't exist in current directory.")
+				throw TLSError.fail(Int(ENOENT), "CA Certificate doesn't exist in current directory.")
 			}
 		}
 		
@@ -764,17 +542,17 @@ public class SSLService: SSLServiceDelegate {
 			var isDir: ObjCBool = false
 			if !FileManager.default.fileExists(atPath: caPath, isDirectory: &isDir) {
 				
-				throw SSLError.fail(Int(ENOENT), "CA Certificate directory path doesn't exist.")
+				throw TLSError.fail(Int(ENOENT), "CA Certificate directory path doesn't exist.")
 			}
 			#if os(Linux)
 				if !isDir {
 					
-					throw SSLError.fail(Int(ENOENT), "CA Certificate directory path doesn't specify a directory.")
+					throw TLSError.fail(Int(ENOENT), "CA Certificate directory path doesn't specify a directory.")
 				}
 			#else
 				if !isDir.boolValue {
 					
-					throw SSLError.fail(Int(ENOENT), "CA Certificate directory path doesn't specify a directory.")
+					throw TLSError.fail(Int(ENOENT), "CA Certificate directory path doesn't specify a directory.")
 				}
 			#endif
 		}
@@ -784,7 +562,7 @@ public class SSLService: SSLServiceDelegate {
 			
 			if !FileManager.default.fileExists(atPath: certFilePath) {
 				
-				throw SSLError.fail(Int(ENOENT), "Certificate doesn't exist at specified path.")
+				throw TLSError.fail(Int(ENOENT), "Certificate doesn't exist at specified path.")
 			}
 		}
 		
@@ -793,7 +571,7 @@ public class SSLService: SSLServiceDelegate {
 			
 			if !FileManager.default.fileExists(atPath: keyFilePath) {
 				
-				throw SSLError.fail(Int(ENOENT), "Key file doesn't exist at specified path.")
+				throw TLSError.fail(Int(ENOENT), "Key file doesn't exist at specified path.")
 			}
 		}
 		
@@ -802,7 +580,7 @@ public class SSLService: SSLServiceDelegate {
 			
 			if !FileManager.default.fileExists(atPath: chainPath) {
 				
-				throw SSLError.fail(Int(ENOENT), "Certificate chain doesn't exist at specified path.")
+				throw TLSError.fail(Int(ENOENT), "Certificate chain doesn't exist at specified path.")
 			}
 		}
 	}
@@ -818,7 +596,7 @@ public class SSLService: SSLServiceDelegate {
 			guard let method = self.method else {
 				
 				let reason = "ERROR: Unable to reference SSL method."
-				throw SSLError.fail(Int(ENOMEM), reason)
+				throw TLSError.fail(Int(ENOMEM), reason)
 			}
 			
 			// Now we can create the context...
@@ -1001,7 +779,7 @@ public class SSLService: SSLServiceDelegate {
 			guard let sslContext = self.context else {
 				
 				let reason = "ERROR: Unable to create SSL context."
-				throw SSLError.fail(Int(ENOMEM), reason)
+				throw TLSError.fail(Int(ENOMEM), reason)
 			}
 			
 			// Now prepare it...
@@ -1019,21 +797,21 @@ public class SSLService: SSLServiceDelegate {
 					guard let certFile = configuration.certificateChainFilePath else {
 						
 						let reason = "ERROR: No PKCS12 file"
-						throw SSLError.fail(Int(ENOENT), reason)
+						throw TLSError.fail(Int(ENOENT), reason)
 					}
 					
 					// 	- Now load them...
 					guard let p12Data = NSData(contentsOfFile: certFile) else {
 						
 						let reason = "ERROR: Error reading PKCS12 file"
-						throw SSLError.fail(Int(ENOENT), reason)
+						throw TLSError.fail(Int(ENOENT), reason)
 					}
 					
 					// 	- Create key dictionary for reading p12 file...
 					guard let passwd: String = self.configuration.password else {
 						
 						let reason = "ERROR: No password for PKCS12 file"
-						throw SSLError.fail(Int(ENOENT), reason)
+						throw TLSError.fail(Int(ENOENT), reason)
 					}
 					let key: NSString = kSecImportExportPassphrase as NSString
 					let options: NSDictionary = [key: passwd as AnyObject]
@@ -1051,7 +829,7 @@ public class SSLService: SSLServiceDelegate {
 					let newArray = items! as [AnyObject] as NSArray
 					if newArray.count == 0 {
 						let reason = "ERROR: Could not load content of PKCS12 file"
-						throw SSLError.fail(Int(ENOENT), reason)
+						throw TLSError.fail(Int(ENOENT), reason)
 					}
 					let dictionary = newArray.object(at: 0)
 					
@@ -1061,7 +839,7 @@ public class SSLService: SSLServiceDelegate {
 					guard let secIdentity = secIdentityRef else {
 						
 						let reason = "ERROR: Can't extract identity."
-						throw SSLError.fail(Int(ENOENT), reason)
+						throw TLSError.fail(Int(ENOENT), reason)
 					}
 					
 					//	-- Cert chain...
@@ -1123,7 +901,7 @@ public class SSLService: SSLServiceDelegate {
 		guard let context = self.context else {
 	
 			let reason = "ERROR: Unable to access SSL context."
-			throw SSLError.fail(Int(EFAULT), reason)
+			throw TLSError.fail(Int(EFAULT), reason)
 		}
 	
 		// Now create the connection...
@@ -1132,7 +910,7 @@ public class SSLService: SSLServiceDelegate {
 		guard let sslConnect = self.cSSL else {
 	
 			let reason = "ERROR: Unable to create SSL connection."
-			throw SSLError.fail(Int(EFAULT), reason)
+			throw TLSError.fail(Int(EFAULT), reason)
 		}
 	
 		// Set the socket file descriptor...
@@ -1172,18 +950,24 @@ public class SSLService: SSLServiceDelegate {
 	///
 	/// - Parameter socket:	The connected `Socket` instance.
 	///
-	private func prepareConnection(socket: Socket) throws {
+	private func prepareConnection(socket: ConnectionDelegate) throws {
 		
 		// Make sure we've got a context...
 		guard let sslContext = self.context else {
 			
 			let reason = "ERROR: Unable to access SSL context."
-			throw SSLError.fail(Int(EFAULT), reason)
+			throw TLSError.fail(Int(EFAULT), reason)
 		}
 		
 		// Set the socket file descriptor as our connection data...
-		self.socketPtr.pointee = socket.socketfd
-		
+        switch socket.endpoint {
+        case .socket(let fd):
+            self.socketPtr.pointee = fd
+        default:
+            let reason = "ERROR: This is a socket implementation."
+            throw TLSError.fail(Int(EPERM), reason)
+        }
+
 		var status: OSStatus = SSLSetConnection(sslContext, self.socketPtr)
 		if status != errSecSuccess {
 			
@@ -1231,7 +1015,7 @@ public class SSLService: SSLServiceDelegate {
 				guard let sslConnect = self.cSSL else {
 				
 					let reason = "ERROR: verifyConnection, code: \(ECONNABORTED), reason: Unable to reference connection)"
-					throw SSLError.fail(Int(ECONNABORTED), reason)
+					throw TLSError.fail(Int(ECONNABORTED), reason)
 				}
 			
 				if SSL_get_peer_certificate(sslConnect) != nil {
@@ -1253,7 +1037,7 @@ public class SSLService: SSLServiceDelegate {
 				
 					// If we're here, we've got an error...
 					let reason = "ERROR: verifyConnection, code: \(rc), reason: Unable to verify presented peer certificate."
-					throw SSLError.fail(Int(ECONNABORTED), reason)
+					throw TLSError.fail(Int(ECONNABORTED), reason)
 				
 				}
 			
@@ -1262,7 +1046,7 @@ public class SSLService: SSLServiceDelegate {
 				if !self.isServer {
 				
 					let reason = "ERROR: verifyConnection, code: \(ECONNABORTED), reason: Peer certificate was not presented."
-					throw SSLError.fail(Int(ECONNABORTED), reason)
+					throw TLSError.fail(Int(ECONNABORTED), reason)
 				}
 			
 			#else
@@ -1284,10 +1068,155 @@ public class SSLService: SSLServiceDelegate {
 			}
 			
 			let reason = failReason ?? "Unknown verification failure"
-			throw SSLError.fail(Int(EFAULT), "ERROR: " + reason)
+			throw TLSError.fail(Int(EFAULT), "ERROR: " + reason)
 		}
 	}
-	
+    
+    ///
+    /// Low level writer
+    ///
+    /// - Parameters:
+    ///        - buffer:        Buffer pointer to be written to socket.
+    ///        - bufSize:        Size of the buffer.
+    ///
+    ///    - Returns the number of bytes written. Zero indicates TLS shutdown, less than zero indicates error.
+    ///
+    private func willSendInternal(buffer: UnsafeRawPointer, bufSize: Int) throws -> Int {
+        
+        print("[[\(Thread.current)]\(#function): to write \(bufSize)")
+        
+        #if os(Linux)
+            
+            let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
+                
+                guard let TLSConnect = self.cTLS else {
+                    
+                    let reason = "ERROR: SSL_write, code: \(ECONNABORTED), reason: Unable to reference connection)"
+                    throw TLSError.fail(Int(ECONNABORTED), reason)
+                }
+                
+                let rc = SSL_write(TLSConnect, buffer, Int32(bufSize))
+                if rc < 0 {
+                    
+                    let lastError = SSL_get_error(TLSConnect, rc)
+                    if lastError == SSL_ERROR_WANT_READ || lastError == SSL_ERROR_WANT_WRITE {
+                        
+                        throw TLSError.retryNeeded
+                    }
+                    
+                    try self.throwLastError(source: "SSL_write", err: lastError)
+                    return 0
+                }
+                return Int(rc)
+            })
+            
+            return processed
+            
+        #else
+            
+            let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
+                
+                guard let sslContext = self.context else {
+                    
+                    let reason = "ERROR: SSL_write, code: \(ECONNABORTED), reason: Unable to reference connection)"
+                    throw TLSError.fail(Int(ECONNABORTED), reason)
+                }
+                
+                var processed = 0
+                let status: OSStatus = SSLWrite(sslContext, buffer, bufSize, &processed)
+                if status == errSSLWouldBlock {
+                    
+                    throw TLSError.retryNeeded
+                    
+                } else if status != errSecSuccess {
+                    
+                    try self.throwLastError(source: "SSLWrite", err: status)
+                }
+                return processed
+            })
+            
+            return processed
+
+            
+        #endif
+    }
+
+    ///
+    /// Low level reader
+    ///
+    /// - Parameters:
+    ///        - buffer:        Buffer pointer.
+    ///        - bufSize:        Size of the buffer.
+    ///
+    ///    - Returns: the number of bytes read. Zero indicates TLS shutdown or in the case of a non-blocking socket, no data available for reading, less than zero indicates error.
+    ///
+    private func willReceiveInternal(into buffer: UnsafeMutableRawPointer, bufSize: Int) throws -> Int {
+        
+        print("[\(Thread.current)]\(#function): to read \(bufSize)")
+        
+        #if os(Linux)
+            
+            let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
+                
+                print("[\(Thread.current)]\(#function): to read \(bufSize)")
+                
+                guard let TLSConnect = self.cTLS else {
+                    
+                    let reason = "ERROR: SSL_read, code: \(ECONNABORTED), reason: Unable to reference connection)"
+                    throw TLSError.fail(Int(ECONNABORTED), reason)
+                }
+                
+                let rc = SSL_read(TLSConnect, buffer, Int32(bufSize))
+                if rc < 0 {
+                    
+                    let lastError = SSL_get_error(TLSConnect, rc)
+                    if lastError == SSL_ERROR_WANT_READ || lastError == SSL_ERROR_WANT_WRITE {
+                        
+                        errno = EAGAIN
+                        return -1
+                    }
+                    
+                    try self.throwLastError(source: "SSL_read", err: lastError)
+                    return 0
+                }
+                return Int(rc)
+            })
+            
+            return processed
+            
+        #else
+            
+            let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
+                
+                guard let sslContext = self.context else {
+                    
+                    let reason = "ERROR: SSLRead, code: \(ECONNABORTED), reason: Unable to reference connection)"
+                    throw TLSError.fail(Int(ECONNABORTED), reason)
+                }
+                
+                var processed = 0
+                let status: OSStatus = SSLRead(sslContext, buffer, bufSize, &processed)
+                if status != errSecSuccess && status != errSSLWouldBlock && status != errSSLClosedGraceful {
+                    
+                    try self.throwLastError(source: "SSLRead", err: status)
+                }
+                
+                if status == errSSLWouldBlock {
+                    
+                    errno = EWOULDBLOCK
+                    return -1
+                }
+                
+                return status == errSSLClosedGraceful ? 0 : processed
+                
+            })
+            
+            return processed
+            
+        #endif
+    }
+
+
 	///
 	/// Throws the last error encountered.
 	///
@@ -1336,7 +1265,7 @@ public class SSLService: SSLServiceDelegate {
 		#endif
 		
 		let reason = "ERROR: \(source), code: \(errorCode), reason: \(errorString)"
-		throw SSLError.fail(Int(errorCode), reason)
+		throw TLSError.fail(Int(errorCode), reason)
 	}
 }
 
