@@ -19,7 +19,7 @@ import ServerSecurity
 
 @testable import TLSService
 
-class TLSServiceTests: XCTestCase {
+class BlueSocketTests: XCTestCase {
 
     let QUIT: String = "QUIT"
     let port: Int32  = 1337
