@@ -26,6 +26,10 @@ import PackageDescription
 		targets: [Target(name: "TLSService")],
 		dependencies: [
             .Package(url: "https://github.com/gtaban/security.git", majorVersion: 0),
+            
+            // Fix me!! BlueSocket is a Test-only dependency.
+            // When SPM supports Test-only dependency capability, BlueSocket should be removed.
+            .Package(url: "https://github.com/gtaban/BlueSocket.git", majorVersion: 0, minor: 13),
 			],
 		exclude: ["Certs"])
 		

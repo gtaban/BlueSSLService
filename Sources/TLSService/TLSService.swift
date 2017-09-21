@@ -1,22 +1,9 @@
+// This source file is part of the Swift.org Server APIs open source project
 //
-//  SSLService.swift
-//  SSLService
+// Copyright (c) 2017 Swift Server API project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
 //
-//  Created by Bill Abt on 5/26/16.
-//
-//  Copyright © 2016 IBM. All rights reserved.
-//
-// 	Licensed under the Apache License, Version 2.0 (the "License");
-// 	you may not use this file except in compliance with the License.
-// 	You may obtain a copy of the License at
-//
-// 	http://www.apache.org/licenses/LICENSE-2.0
-//
-// 	Unless required by applicable law or agreed to in writing, software
-// 	distributed under the License is distributed on an "AS IS" BASIS,
-// 	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// 	See the License for the specific language governing permissions and
-// 	limitations under the License.
+// See http://swift.org/LICENSE.txt for license information
 //
 
 import Foundation
@@ -28,12 +15,12 @@ import ServerSecurity
 
 import Dispatch
 
-// MARK: SSLService
+// MARK: TLSService
 
 ///
-/// **SSLService:** SSL Service Plugin for Socket using **Apple Secure Transport** on `macOS` and **OpenSSL** on `Linux`.
+/// **TLSService:** SSL Service Plugin for Socket using **Apple Secure Transport** on `macOS` and **OpenSSL** on `Linux`.
 ///
-public class SSLService: TLSServiceDelegate {
+public class TLSService: TLSServiceDelegate {
 	
 	// MARK: Statics
 	
@@ -70,7 +57,7 @@ public class SSLService: TLSServiceDelegate {
 			errSecAuthFailed    	 : "errSecAuthFailed",
 			errSSLClosedGraceful	 : "errSSLClosedGraceful",
 			errSSLXCertChainInvalid	 : "errSSLXCertChainInvalid",
-			errSSLPeerAuthCompleted: "errSSLPeerAuthCompleted"
+			errSSLPeerAuthCompleted  : "errSSLPeerAuthCompleted"
 		]
 	
 	#endif
@@ -118,15 +105,15 @@ public class SSLService: TLSServiceDelegate {
 	// MARK: --- Settable
 	
 	///
-	/// Verification Callback. Called by the internal `verifyConnection()` function to do any *additional* connection verification.  This property is set after initializing the `SSLService`.
+	/// Verification Callback. Called by the internal `verifyConnection()` function to do any *additional* connection verification.  This property is set after initializing the `TLSService`.
 	///
 	/// - Parameters service:	This service module
 	///
 	/// - Returns:	Tuple containing a `Bool` to indicate success or failure of the verification and a `String?` containing text describing the error if desired.
 	///
-	public var verifyCallback: ((_ service: SSLService) -> (Bool, String?))? = nil
+	public var verifyCallback: ((_ service: TLSService) -> (Bool, String?))? = nil
 	
-	/// If true, skips the internal verification.  However, if the `verifyCallback` property is set, the callback will be called regardless of this setting. Default is false. This property is set after initializing the `SSLService`.
+	/// If true, skips the internal verification.  However, if the `verifyCallback` property is set, the callback will be called regardless of this setting. Default is false. This property is set after initializing the `TLSService`.
 	public var skipVerification: Bool = false
 	
 	// MARK: --- Read Only
@@ -157,10 +144,10 @@ public class SSLService: TLSServiceDelegate {
 		
 		/// List of supported ALPN protocols
 		public func addSupportedAlpnProtocol(proto: String) {
-			if SSLService.availableAlpnProtocols.contains(proto) {
+			if TLSService.availableAlpnProtocols.contains(proto) {
 				return
 			}
-			SSLService.availableAlpnProtocols.append(proto)
+			TLSService.availableAlpnProtocols.append(proto)
 		}
 		private static var availableAlpnProtocols = [String]()
 		
@@ -180,11 +167,11 @@ public class SSLService: TLSServiceDelegate {
 	// MARK: Lifecycle
 	
 	///
-	/// Initialize an `SSLService` instance.
+	/// Initialize an `TLSService` instance.
 	///
 	/// - Parameter config:		Configuration to use.
 	///
-	/// - Returns: `SSLService` instance.
+	/// - Returns: `TLSService` instance.
 	///
 	public init?(usingConfiguration config: TLSConfiguration) throws {
 		
@@ -196,13 +183,13 @@ public class SSLService: TLSServiceDelegate {
 	}
 	
 	///
-	/// Clone an existing instance of `SSLService`. Should only be called by Server.
+	/// Clone an existing instance of `TLSService`. Should only be called by Server.
 	///
-	/// - Parameter source:		The instance of `SSLService` to clone.
+	/// - Parameter source:		The instance of `TLSService` to clone.
 	///
-	/// - Returns: New `SSLService` instance cloned from the provided instance.
+	/// - Returns: New `TLSService` instance cloned from the provided instance.
 	///
-	private init?(with source: SSLService) throws {
+	private init?(with source: TLSService) throws {
 		
 		self.configuration = source.configuration
 		
@@ -217,7 +204,7 @@ public class SSLService: TLSServiceDelegate {
 	// MARK: TLSServiceDelegate Protocol
 	
     ///
-    /// Initialize TLS Service for Client
+    /// Initialize TLSService for Client
     ///
     public func didCreateClient() throws {
         
@@ -227,7 +214,7 @@ public class SSLService: TLSServiceDelegate {
     }
     
     ///
-    /// Initialize TLS Service for Server
+    /// Initialize TLSService for Server
     ///
     public func didCreateServer() throws {
         
@@ -237,7 +224,7 @@ public class SSLService: TLSServiceDelegate {
     }
 	
 	///
-	/// Deinitialize `SSLService`
+	/// Deinitialize `TLSService`
 	///
 	public func willDestroy() {
 		
@@ -289,7 +276,7 @@ public class SSLService: TLSServiceDelegate {
 		// If the new socket doesn't have a delegate, create one using self...
 		if socket.TLSdelegate == nil {
 			
-			let delegate = try SSLService(with: self)
+			let delegate = try TLSService(with: self)
 			socket.TLSdelegate = delegate
 			try socket.TLSdelegate?.didAccept(connection: socket)
 			
@@ -425,7 +412,7 @@ public class SSLService: TLSServiceDelegate {
 	// MARK: Private Methods
 	
     ///
-    /// Initialize `SSLService`
+    /// Initialize `TLSService`
     ///
     /// - Parameter asServer:    True for initializing a server, otherwise a client.
     ///
@@ -435,12 +422,12 @@ public class SSLService: TLSServiceDelegate {
             
             // Common initialization...
             //     - We only do this once...
-            if !SSLService.initialized {
+            if !TLSService.initialized {
                 SSL_library_init()
                 SSL_load_error_strings()
                 OPENSSL_config(nil)
                 OPENSSL_add_all_algorithms_conf()
-                SSLService.initialized = true
+                TLSService.initialized = true
             }
             
             // Server or client specific method determination...
@@ -475,8 +462,8 @@ public class SSLService: TLSServiceDelegate {
 		if let certString = configuration.certificateString {
 			
 			// Make sure that string in a valid format...
-			guard certString.hasPrefix(SSLService.PEM_BEGIN_MARKER) &&
-				certString.hasSuffix(SSLService.PEM_END_MARKER) &&
+			guard certString.hasPrefix(TLSService.PEM_BEGIN_MARKER) &&
+				certString.hasSuffix(TLSService.PEM_END_MARKER) &&
 				certString.utf8.count > 0 else {
 					
 					throw TLSError.fail(Int(ENOENT), "PEM Certificate String is not valid.")
@@ -618,7 +605,7 @@ public class SSLService: TLSServiceDelegate {
 			if self.configuration.certsAreSelfSigned {
 				SSL_CTX_set_verify(context, SSL_VERIFY_NONE, nil)
 			}
-			SSL_CTX_set_verify_depth(context, SSLService.DEFAULT_VERIFY_DEPTH)
+			SSL_CTX_set_verify_depth(context, TLSService.DEFAULT_VERIFY_DEPTH)
 			
 			//	- Auto ECDH handling...  Note: requires OpenSSL 1.0.2 or greater.
 			SSL_CTX_setAutoECDH(context)
@@ -708,7 +695,7 @@ public class SSLService: TLSServiceDelegate {
 				
 				//E.g. data: [ 0x02, 0x68, 0x32 ] //2, 'h', '2'
 				var availBytes = [UInt8]()
-				let available = SSLService.availableAlpnProtocols
+				let available = TLSService.availableAlpnProtocols
 				
 				for proto in available {
 					
@@ -735,7 +722,7 @@ public class SSLService: TLSServiceDelegate {
 				if let _in = _in {
 					
 					let data = Data(bytes: _in, count: Int(_inlen))
-					let available = SSLService.availableAlpnProtocols
+					let available = TLSService.availableAlpnProtocols
 					var lengthByteIndex = 0
 					
 					while lengthByteIndex < data.count {
