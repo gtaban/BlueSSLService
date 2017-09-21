@@ -22,12 +22,12 @@ import PackageDescription
 #if os(Linux) || os(macOS) || os(iOS) || os(tvOS)
 
 	let package = Package(
-		name: "SSLService",
-		targets: [Target(name: "SSLService")],
+		name: "TLSService",
+		targets: [Target(name: "TLSService")],
 		dependencies: [
 			.Package(url: "https://github.com/IBM-Swift/BlueSocket.git", majorVersion: 0, minor: 12),
 			],
-		exclude: ["SSLService.xcodeproj", "README.md", "Sources/Info.plist"])
+		exclude: ["TLSService.xcodeproj", "README.md", "Sources/Info.plist"])
 		
 	#if os(Linux)
 		
