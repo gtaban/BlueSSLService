@@ -22,8 +22,6 @@
 import Foundation
 import ServerSecurity
 
-//import Socket
-
 #if os(Linux)
 	import OpenSSL
 #endif
@@ -895,7 +893,7 @@ public class SSLService: TLSServiceDelegate {
 	///
 	/// - Returns: `UnsafeMutablePointer` to the SSL connection.
 	///
-	private func prepareConnection(socket: Socket) throws -> UnsafeMutablePointer<SSL> {
+	private func prepareConnection(socket: ConnectionDelegate) throws -> UnsafeMutablePointer<SSL> {
 	
 		// Make sure our context is valid...
 		guard let context = self.context else {
@@ -914,7 +912,14 @@ public class SSLService: TLSServiceDelegate {
 		}
 	
 		// Set the socket file descriptor...
-		SSL_set_fd(sslConnect, socket.socketfd)
+        switch socket.endpoint {
+        case .socket(let fd):
+            SSL_set_fd(sslConnect, fd)
+        default:
+            let reason = "ERROR: This is a socket implementation."
+            throw TLSError.fail(Int(EPERM), reason)
+        }
+
 	
 		return sslConnect
 	}
@@ -1089,7 +1094,7 @@ public class SSLService: TLSServiceDelegate {
             
             let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
                 
-                guard let TLSConnect = self.cTLS else {
+                guard let TLSConnect = self.cSSL else {
                     
                     let reason = "ERROR: SSL_write, code: \(ECONNABORTED), reason: Unable to reference connection)"
                     throw TLSError.fail(Int(ECONNABORTED), reason)
@@ -1160,7 +1165,7 @@ public class SSLService: TLSServiceDelegate {
                 
                 print("[\(Thread.current)]\(#function): to read \(bufSize)")
                 
-                guard let TLSConnect = self.cTLS else {
+                guard let TLSConnect = self.cSSL else {
                     
                     let reason = "ERROR: SSL_read, code: \(ECONNABORTED), reason: Unable to reference connection)"
                     throw TLSError.fail(Int(ECONNABORTED), reason)
