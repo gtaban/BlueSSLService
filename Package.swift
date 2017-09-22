@@ -1,36 +1,52 @@
-// This source file is part of the Swift.org Server APIs open source project
-//
-// Copyright (c) 2017 Swift Server API project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See http://swift.org/LICENSE.txt for license information
-//
+// swift-tools-version:4.0
+// The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
-#if os(Linux) || os(macOS) || os(iOS) || os(tvOS)
+#if os(Linux) || os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
 
-	let package = Package(
-		name: "TLSService",
-		targets: [Target(name: "TLSService")],
-		dependencies: [
-            .Package(url: "https://github.com/gtaban/security.git", majorVersion: 0),
-            
-            // Fix me!! BlueSocket is a Test-only dependency.
-            // When SPM supports Test-only dependency capability, BlueSocket should be removed.
-            .Package(url: "https://github.com/gtaban/BlueSocket.git", majorVersion: 0, minor: 13),
-			],
-		exclude: ["Certs"])
-		
-	#if os(Linux)
-        // module map for OpenSSL libSSL and libcrypto
-		package.dependencies.append(
-			.Package(url: "https://github.com/IBM-Swift/OpenSSL.git", majorVersion: 0, minor: 3))
-		
-	#endif
-	
-#else
-	
-	fatalError("Unsupported OS")
-	
+var packageDependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/gtaban/security.git", from: "0.0.4"),
+    .package(url: "https://github.com/gtaban/BlueSocket.git", from: "0.13.0") ]
+var targetDependencies: [Target.Dependency] = [
+    .byNameItem(name: "ServerSecurity"),
+    .byNameItem(name: "Socket")]
+
+#if os(Linux)
+packageDependencies.append(.package(url: "https://github.com/IBM-Swift/OpenSSL.git", from: "0.3.0"))
+targetDependencies.append(.byNameItem(name: "OpenSSL"))
 #endif
+
+let package = Package(
+    name: "TLSService",
+
+    products: [
+        // Products define the executables and libraries produced by a package, and make them visible to other packages.
+        .library(
+            name: "TLSService",
+            targets: ["TLSService"]),
+        ],
+
+    // Dependencies declare other packages that this package depends
+    dependencies: packageDependencies,
+
+    targets: [
+        // Targets are the basic building blocks of a package. A target can define a module or a test suite.
+        // Targets can depend on other targets in this package, and on products in packages which this package depends on.
+        .target(
+            name: "TLSService",
+            dependencies: targetDependencies,
+            exclude: ["Certs"]),
+        .testTarget(
+            name: "TLSServiceTests",
+            dependencies: targetDependencies,
+            exclude: ["Certs"]),
+        ]
+)
+
+#else
+
+fatalError("Unsupported OS")
+
+#endif
+
