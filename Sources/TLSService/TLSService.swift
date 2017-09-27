@@ -352,8 +352,6 @@ public class TLSService: TLSServiceDelegate {
     ///
     public func willSend(data: Data) throws -> Int {
         
-        print("\(#function):")
-        
         // If there's no data in the Data object, no need to write anything...
         if data.count == 0 {
             return 0
@@ -375,7 +373,6 @@ public class TLSService: TLSServiceDelegate {
     ///    - Returns the number of bytes written. Zero indicates TLS shutdown, less than zero indicates error.
     ///
     public func willSend(buffer: UnsafeRawPointer, bufSize: Int) throws -> Int {
-        print("\(#function):")
         
         return try self.willSendInternal(buffer: buffer, bufSize: bufSize)
     }
@@ -1075,8 +1072,6 @@ public class TLSService: TLSServiceDelegate {
     ///
     private func willSendInternal(buffer: UnsafeRawPointer, bufSize: Int) throws -> Int {
         
-        print("[[\(Thread.current)]\(#function): to write \(bufSize)")
-        
         #if os(Linux)
             
             let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
@@ -1144,13 +1139,9 @@ public class TLSService: TLSServiceDelegate {
     ///
     private func willReceiveInternal(into buffer: UnsafeMutableRawPointer, bufSize: Int) throws -> Int {
         
-        print("[\(Thread.current)]\(#function): to read \(bufSize)")
-        
         #if os(Linux)
             
             let processed = try self.rwDispatch.sync(execute: { [unowned self] () -> Int in
-                
-                print("[\(Thread.current)]\(#function): to read \(bufSize)")
                 
                 guard let TLSConnect = self.cSSL else {
                     
