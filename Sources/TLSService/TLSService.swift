@@ -343,6 +343,43 @@ public class TLSService: TLSServiceDelegate {
 	}
 
     ///
+    /// Gets the amount of data in the current TLS data record that is immediately
+    /// available for reading on a TLS connection.
+    ///
+    /// - Parameters:
+    ///
+    ///    - Returns the amount of decrypted data that TLS layer has buffered
+    ///
+    public func getPendingBytes() throws -> Int {
+        var leftover = 0
+        
+        #if os(Linux)
+            guard let TLSConnect = self.cSSL else {
+                
+                let reason = "ERROR: SSL_write, code: \(ECONNABORTED), reason: Unable to reference connection)"
+                throw TLSError.fail(Int(ECONNABORTED), reason)
+            }
+            
+            leftover = SSL_pending(TLSConnect)
+            
+        #else
+            guard let sslContext = self.context else {
+                
+                let reason = "ERROR: SSLRead, code: \(ECONNABORTED), reason: Unable to reference connection)"
+                throw TLSError.fail(Int(ECONNABORTED), reason)
+            }
+            
+            let status =  SSLGetBufferedReadSize(sslContext, &leftover)
+            if status != errSecSuccess {
+                
+                try self.throwLastError(source: "SSLRead", err: status)
+            }
+        #endif
+        
+        return leftover
+    }
+    
+    ///
     /// Low level writer
     ///
     /// - Parameters:
