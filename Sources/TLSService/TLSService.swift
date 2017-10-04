@@ -360,7 +360,7 @@ public class TLSService: TLSServiceDelegate {
                 throw TLSError.fail(Int(ECONNABORTED), reason)
             }
             
-            leftover = SSL_pending(TLSConnect)
+            leftover = Int(SSL_pending(TLSConnect))
             
         #else
             guard let sslContext = self.context else {
